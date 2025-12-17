@@ -134,13 +134,31 @@ if 'res' in st.session_state:
             st.success("Thank you! Your feedback has been recorded.")
 
 # ---------------- ADMIN SECTION (SIDEBAR) ----------------
-st.sidebar.title("🛠 Admin Dashboard")
-if st.sidebar.checkbox("Show Collected Responses"):
-    if os.path.exists("feedback_results.csv"):
-        data = pd.read_csv("feedback_results.csv")
-        st.sidebar.write(f"Total entries: {len(data)}")
-        st.sidebar.dataframe(data)
-        csv = data.to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button(label="📥 Download CSV", data=csv, file_name="loan_data.csv", mime="text/csv")
-    else:
-        st.sidebar.warning("No feedback data yet.")
+st.sidebar.title("🛠 Admin Access")
+
+# Password field in Sidebar
+password = st.sidebar.text_input("Enter Admin Password", type="password")
+
+# Replace 'admin123' with any password you like
+if password == "admin123":
+    st.sidebar.success("Welcome back, Admin!")
+    if st.sidebar.checkbox("Show Collected Responses"):
+        if os.path.exists("feedback_results.csv"):
+            data = pd.read_csv("feedback_results.csv")
+            st.sidebar.write(f"Total entries: {len(data)}")
+            st.sidebar.dataframe(data)
+            
+            # Download Link
+            csv = data.to_csv(index=False).encode('utf-8')
+            st.sidebar.download_button(
+                label="📥 Download Data for Report",
+                data=csv,
+                file_name="loan_feedback_data.csv",
+                mime="text/csv",
+            )
+        else:
+            st.sidebar.warning("No feedback data found yet.")
+elif password != "":
+    st.sidebar.error("Incorrect Password!")
+else:
+    st.sidebar.info("Please enter password to view user data.")
