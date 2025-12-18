@@ -66,7 +66,6 @@ with col3:
 # ---------------- PREDICTION LOGIC ----------------
 st.divider()
 if st.button("🔍 ANALYZE ELIGIBILITY"):
-    # Preprocessing
     loan_scaled = loan_pkr / 1000
     total_income = income + co_income
     
@@ -88,7 +87,6 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
     input_df = pd.DataFrame([input_data]).reindex(columns=feature_cols, fill_value=0)
     prediction = model.predict(input_df)[0]
     
-    # Result Box logic
     if prediction == 1:
         res_text = "Loan Approval: APPROVED ✅"
         st.markdown(f'<div class="status-box approved"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
@@ -96,7 +94,6 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
         res_text = "Loan Approval: REJECTED ❌"
         st.markdown(f'<div class="status-box rejected"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
     
-    # Accuracy display
     st.write(f"<center><p style='color:gray; margin-top:10px;'>Model Prediction Accuracy: <b>82.4%</b></p></center>", unsafe_allow_html=True)
     
     st.session_state['res'] = res_text
@@ -136,33 +133,40 @@ if 'res' in st.session_state:
 # ---------------- ADMIN SECTION (SIDEBAR) ----------------
 st.sidebar.title("🛠 Admin Access")
 
-# Password from Secrets for Security
+# Password from Secrets
 password_input = st.sidebar.text_input("Enter Admin Password", type="password")
 
-# Fetching the real password from Streamlit Settings
 try:
     real_password = st.secrets["general"]["admin_password"]
 except:
-    real_password = "admin123" # Fallback if secret not set
+    real_password = "admin123" 
 
 if password_input == real_password:
     st.sidebar.success("Welcome back, Admin!")
-    if st.sidebar.checkbox("Show Collected Responses"):
-        if os.path.exists("feedback_results.csv"):
-            data = pd.read_csv("feedback_results.csv")
-            st.sidebar.write(f"Total entries: {len(data)}")
-            st.sidebar.dataframe(data)
-            
-            csv = data.to_csv(index=False).encode('utf-8')
-            st.sidebar.download_button(
-                label="📥 Download Data for Report",
-                data=csv,
-                file_name="loan_feedback_data.csv",
-                mime="text/csv",
-            )
-        else:
-            st.sidebar.warning("No feedback data found yet.")
+    
+    if os.path.exists("feedback_results.csv"):
+        df = pd.read_csv("feedback_results.csv")
+        
+        st.sidebar.subheader("📝 Manage Feedbacks")
+        st.sidebar.info("Select row if you want to 'Delete'.")
+
+        # Excel-style editor
+        edited_df = st.sidebar.data_editor(
+            df, 
+            num_rows="dynamic", 
+            use_container_width=True,
+            key="feedback_editor"
+        )
+        
+        if st.sidebar.button("💾 Save Changes"):
+            edited_df.to_csv("feedback_results.csv", index=False)
+            st.sidebar.success("Data updated successfully!")
+            st.rerun()
+
+        st.sidebar.markdown("---")
+        csv = edited_df.to_csv(index=False).encode('utf-8')
+        st.sidebar.download_button(label="📥 Download Clean Data", data=csv, file_name="loan_data.csv", mime="text/csv")
+    else:
+        st.sidebar.warning("No feedback data found.")
 elif password_input != "":
     st.sidebar.error("Incorrect Password!")
-else:
-    st.sidebar.info("Please enter password to view user data.")
