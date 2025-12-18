@@ -10,7 +10,7 @@ from datetime import datetime
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Loan System v2.0", layout="wide")
 
-# Custom CSS
+# Custom CSS for UI
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -18,7 +18,17 @@ st.markdown("""
     .status-box { padding: 20px; border-radius: 10px; text-align: center; margin-top: 10px; }
     .approved { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .rejected { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-    .success-text { color: #28a745; font-weight: bold; font-size: 24px; text-align: center; border: 2px solid #28a745; padding: 10px; border-radius: 10px; }
+    .success-text { 
+        color: #28a745; 
+        font-weight: bold; 
+        font-size: 22px; 
+        text-align: center; 
+        border: 2px solid #28a745; 
+        padding: 15px; 
+        border-radius: 10px; 
+        margin-top: 20px;
+        background-color: #f0fff4;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -106,7 +116,7 @@ if 'res' in st.session_state:
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "User": st.session_state['user_data']['name'],
                 "Prediction": st.session_state['res'],
-                "Model_Accuracy": 82.4, 
+                "Model_Accuracy": 82.4,
                 "User_Rating": rating,
                 "Accuracy_Opinion": opinion,
                 "Suggestions": sugs
@@ -120,30 +130,45 @@ if 'res' in st.session_state:
             else:
                 new_df.to_csv(log_file, mode='a', header=False, index=False, quoting=csv.QUOTE_NONNUMERIC)
             
-            # --- EFFECT & SUCCESS MESSAGE ---
             st.balloons()
             st.markdown('<p class="success-text">FEEDBACK DONE SUCCESSFULLY! ✅</p>', unsafe_allow_html=True)
-            time.sleep(2) # Balloons dikhane ke liye wait
+            time.sleep(2) 
             st.rerun()
 
-# ---------------- ADMIN SIDEBAR ----------------
+# ---------------- ADMIN SIDEBAR (SAFE SECRETS) ----------------
 st.sidebar.title("🛠 Admin Access")
-password = st.sidebar.text_input("Password", type="password")
 
-if password == "admin123":
-    st.sidebar.success("Logged In")
+# Yahan secrets check ho rahe hain, agar nahi miley toh 'admin123' chalay ga
+try:
+    real_password = st.secrets["admin_password"]
+except:
+    real_password = "admin123"
+
+pass_input = st.sidebar.text_input("Enter Admin Password", type="password")
+
+if pass_input == real_password:
+    st.sidebar.success("Welcome, Admin!")
     if os.path.exists("feedback_results.csv"):
         df_admin = pd.read_csv("feedback_results.csv", engine='python')
-        st.sidebar.subheader(f"Total Feedback: {len(df_admin)}")
+        st.sidebar.subheader(f"📊 Total Feedback: {len(df_admin)}")
         
-        # Row selection/deletion control aapke paas hai
-        edited_df = st.sidebar.data_editor(df_admin, num_rows="dynamic", width='stretch', key="editor")
+        edited_df = st.sidebar.data_editor(
+            df_admin, 
+            num_rows="dynamic", 
+            width='stretch', 
+            key="admin_editor"
+        )
         
         if st.sidebar.button("💾 Save Changes"):
             edited_df.to_csv("feedback_results.csv", index=False, quoting=csv.QUOTE_NONNUMERIC)
-            st.sidebar.success("Changes Saved!")
+            st.sidebar.success("Data Updated Successfully!")
             st.rerun()
 
         st.sidebar.markdown("---")
-        csv_data = df_admin.to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button("📥 Download Data", csv_data, "loan_report.csv")
+        csv_download = df_admin.to_csv(index=False).encode('utf-8')
+        st.sidebar.download_button("📥 Download Excel Report", csv_download, "loan_feedback_report.csv")
+    else:
+        st.sidebar.info("No records found yet.")
+else:
+    if pass_input != "":
+        st.sidebar.error("Incorrect Password!")
