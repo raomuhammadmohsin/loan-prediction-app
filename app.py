@@ -69,21 +69,16 @@ with col3:
     education = st.selectbox("Education", ["Graduate", "Not Graduate"])
     self_emp = st.selectbox("Self Employed", ["Yes", "No"])
 
-# ---------------- PREDICTION LOGIC (With Strict Check) ----------------
+# --- PREDICTION LOGIC (Dynamic Confidence) ---
 st.divider()
 if st.button("🔍 ANALYZE ELIGIBILITY"):
-    # Validation Check: Agar name khali hai ya koi value missing hai
     if not user_name.strip():
         st.error("⚠️ Please enter your Full Name before proceeding!")
-    elif income <= 0:
-        st.error("⚠️ Income must be greater than 0!")
-    elif loan_pkr < 10000:
-        st.error("⚠️ Loan amount must be at least 10,000 PKR!")
     else:
-        # Agar sab theek hai toh hi prediction chalegi
         loan_scaled = loan_pkr / 1000
         total_income = income + co_income
         
+        # Input Data Formating
         input_data = {
             "ApplicantIncome": income, "CoapplicantIncome": co_income, "LoanAmount": loan_scaled,
             "Loan_Amount_Term": term * 12, "Credit_History": ch_val, "TotalIncome": total_income,
@@ -100,16 +95,48 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
         }
 
         input_df = pd.DataFrame([input_data]).reindex(columns=feature_cols, fill_value=0)
+        
+        # --- ASLI MODEL KI CALCULATION ---
         prediction = model.predict(input_df)[0]
+        
+        # Ab hum model se pooch rahe hain ke tum kitne % sure ho?
+        probs = model.predict_proba(input_df)[0] 
+        # Agar Approved hai toh Approval ki probability, warna Rejection ki
+        confidence = probs[1] if prediction == 1 else probs[0]
+        dynamic_acc = round(confidence * 100, 2)
         
         res_text = "APPROVED ✅" if prediction == 1 else "REJECTED ❌"
         color_class = "approved" if prediction == 1 else "rejected"
         
         st.markdown(f'<div class="status-box {color_class}"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
-        st.write(f"<center>Model Accuracy: <b>82.4%</b></center>", unsafe_allow_html=True)
         
+        # Ab yahan 82.4 ki jagah dynamic value dikhayen ge
+        st.write(f"<center>Prediction Confidence: <b>{dynamic_acc}%</b></center>", unsafe_allow_html=True)
+        
+        # Session State update
         st.session_state['res'] = res_text
-        st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr}
+        st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr, "conf": dynamic_acc}
+
+        # --- AUTO-SAVE TO CSV ---
+        auto_entry = {
+            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "User": user_name,
+            "Income": income,
+            "Loan_Amount": loan_pkr,
+            "Prediction": res_text,
+            "Model_Accuracy": dynamic_acc, # Asli accuracy save hogi
+            "Rating": "N/A",
+            "Accuracy_Opinion": "N/A",
+            "Suggestions": "Pending"
+        }
+        
+        # Save logic (Wahi purani wali)
+        new_df = pd.DataFrame([auto_entry])
+        cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
+        new_df[cols_order].to_csv("feedback_results.csv", mode='a', header=not os.path.exists("feedback_results.csv"), index=False)
+        
+        st.toast("Data Logged Successfully!")
+
 # ---------------- FEEDBACK SECTION (Fixed Column Order) ----------------
 if 'res' in st.session_state:
     st.divider()
