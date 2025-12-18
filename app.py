@@ -49,59 +49,67 @@ except Exception as e:
 # ---------------- HEADER ----------------
 st.title("🏦 Strategic Loan Prediction System")
 st.divider()
-
-# ---------------- INPUT SECTION ----------------
+# ---------------- INPUT SECTION (Updated with Validation) ----------------
 col1, col2, col3 = st.columns(3)
 with col1:
-    user_name = st.text_input("Full Name")
+    # Label ke sath * laga diya
+    user_name = st.text_input("Full Name *") 
     gender = st.selectbox("Gender", ["Male", "Female"])
     married = st.selectbox("Married", ["Yes", "No"])
     dependents = st.selectbox("Dependents", ["0", "1", "2", "3+"])
 with col2:
-    income = st.number_input("Monthly Income (PKR)", min_value=0, value=75000)
+    income = st.number_input("Monthly Income (PKR) *", min_value=0, value=75000)
     co_income = st.number_input("Co-Applicant Income (PKR)", min_value=0, value=0)
     credit_history = st.selectbox("Credit Record", ["Good", "Poor"])
     ch_val = 1.0 if credit_history == "Good" else 0.0
 with col3:
-    loan_pkr = st.number_input("Loan Amount (PKR)", min_value=10000, value=500000)
+    loan_pkr = st.number_input("Loan Amount (PKR) *", min_value=10000, value=500000)
     term = st.slider("Tenure (Years)", 1, 30, 15)
     property_area = st.selectbox("Area", ["Urban", "Semiurban", "Rural"])
     education = st.selectbox("Education", ["Graduate", "Not Graduate"])
     self_emp = st.selectbox("Self Employed", ["Yes", "No"])
 
-# ---------------- PREDICTION LOGIC ----------------
+# ---------------- PREDICTION LOGIC (With Strict Check) ----------------
 st.divider()
 if st.button("🔍 ANALYZE ELIGIBILITY"):
-    loan_scaled = loan_pkr / 1000
-    total_income = income + co_income
-    
-    input_data = {
-        "ApplicantIncome": income, "CoapplicantIncome": co_income, "LoanAmount": loan_scaled,
-        "Loan_Amount_Term": term * 12, "Credit_History": ch_val, "TotalIncome": total_income,
-        "Income_to_Loan": total_income / (loan_pkr + 1),
-        "log_ApplicantIncome": np.log1p(income), "log_LoanAmount": np.log1p(loan_scaled),
-        "log_TotalIncome": np.log1p(total_income),
-        "Gender_Male": 1 if gender == "Male" else 0, "Married_Yes": 1 if married == "Yes" else 0,
-        "Education_Not Graduate": 1 if education == "Not Graduate" else 0,
-        "Self_Employed_Yes": 1 if self_emp == "Yes" else 0,
-        "Property_Area_Semiurban": 1 if property_area == "Semiurban" else 0,
-        "Property_Area_Urban": 1 if property_area == "Urban" else 0,
-        "Dependents_1": 1 if dependents == "1" else 0, "Dependents_2": 1 if dependents == "2" else 0,
-        "Dependents_3+": 1 if dependents == "3+" else 0
-    }
+    # Validation Check: Agar name khali hai ya koi value missing hai
+    if not user_name.strip():
+        st.error("⚠️ Please enter your Full Name before proceeding!")
+    elif income <= 0:
+        st.error("⚠️ Income must be greater than 0!")
+    elif loan_pkr < 10000:
+        st.error("⚠️ Loan amount must be at least 10,000 PKR!")
+    else:
+        # Agar sab theek hai toh hi prediction chalegi
+        loan_scaled = loan_pkr / 1000
+        total_income = income + co_income
+        
+        input_data = {
+            "ApplicantIncome": income, "CoapplicantIncome": co_income, "LoanAmount": loan_scaled,
+            "Loan_Amount_Term": term * 12, "Credit_History": ch_val, "TotalIncome": total_income,
+            "Income_to_Loan": total_income / (loan_pkr + 1),
+            "log_ApplicantIncome": np.log1p(income), "log_LoanAmount": np.log1p(loan_scaled),
+            "log_TotalIncome": np.log1p(total_income),
+            "Gender_Male": 1 if gender == "Male" else 0, "Married_Yes": 1 if married == "Yes" else 0,
+            "Education_Not Graduate": 1 if education == "Not Graduate" else 0,
+            "Self_Employed_Yes": 1 if self_emp == "Yes" else 0,
+            "Property_Area_Semiurban": 1 if property_area == "Semiurban" else 0,
+            "Property_Area_Urban": 1 if property_area == "Urban" else 0,
+            "Dependents_1": 1 if dependents == "1" else 0, "Dependents_2": 1 if dependents == "2" else 0,
+            "Dependents_3+": 1 if dependents == "3+" else 0
+        }
 
-    input_df = pd.DataFrame([input_data]).reindex(columns=feature_cols, fill_value=0)
-    prediction = model.predict(input_df)[0]
-    
-    res_text = "APPROVED ✅" if prediction == 1 else "REJECTED ❌"
-    color_class = "approved" if prediction == 1 else "rejected"
-    
-    st.markdown(f'<div class="status-box {color_class}"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
-    st.write(f"<center>Model Accuracy: <b>82.4%</b></center>", unsafe_allow_html=True)
-    
-    st.session_state['res'] = res_text
-    st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr}
-
+        input_df = pd.DataFrame([input_data]).reindex(columns=feature_cols, fill_value=0)
+        prediction = model.predict(input_df)[0]
+        
+        res_text = "APPROVED ✅" if prediction == 1 else "REJECTED ❌"
+        color_class = "approved" if prediction == 1 else "rejected"
+        
+        st.markdown(f'<div class="status-box {color_class}"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
+        st.write(f"<center>Model Accuracy: <b>82.4%</b></center>", unsafe_allow_html=True)
+        
+        st.session_state['res'] = res_text
+        st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr}
 # ---------------- FEEDBACK SECTION (Fixed Column Order) ----------------
 if 'res' in st.session_state:
     st.divider()
