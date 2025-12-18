@@ -141,7 +141,7 @@ if 'res' in st.session_state:
             time.sleep(2) 
             st.rerun()
 
-# ---------------- ADMIN SIDEBAR ----------------
+# ---------------- ADMIN SIDEBAR (Safe Reading) ----------------
 st.sidebar.title("🛠 Admin Access")
 
 try:
@@ -154,27 +154,28 @@ pass_input = st.sidebar.text_input("Enter Admin Password", type="password")
 if pass_input == real_password:
     st.sidebar.success("Welcome, Admin!")
     if os.path.exists("feedback_results.csv"):
-        df_admin = pd.read_csv("feedback_results.csv", engine='python')
-        
-        # Enforce column order for display as well
-        cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
-        df_admin = df_admin.reindex(columns=cols_order)
-        
-        st.sidebar.subheader(f"📊 Total Entries: {len(df_admin)}")
-        
-        edited_df = st.sidebar.data_editor(
-            df_admin, 
-            num_rows="dynamic", 
-            width='stretch', 
-            key="admin_editor_vFinal"
-        )
-        
-        if st.sidebar.button("💾 Save Changes"):
-            edited_df.to_csv("feedback_results.csv", index=False, quoting=csv.QUOTE_NONNUMERIC)
-            st.sidebar.success("Database Updated!")
-            st.rerun()
+        try:
+            # Error handling ke sath read karein
+            df_admin = pd.read_csv("feedback_results.csv", engine='python', on_bad_lines='skip')
             
+            # Columns order fix karein
+            cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
+            df_admin = df_admin.reindex(columns=cols_order)
+            
+            st.sidebar.subheader(f"📊 Total Entries: {len(df_admin)}")
+            
+            edited_df = st.sidebar.data_editor(df_admin, num_rows="dynamic", key="admin_editor_vFinal")
+            
+            if st.sidebar.button("💾 Save Changes"):
+                edited_df.to_csv("feedback_results.csv", index=False, quoting=csv.QUOTE_NONNUMERIC)
+                st.sidebar.success("Database Updated!")
+                st.rerun()
+                
+        except Exception as e:
+            st.sidebar.error("⚠️ Feedback file is corrupted (Column Mismatch).")
+            if st.sidebar.button("🗑️ Reset & Fix File"):
+                os.remove("feedback_results.csv")
+                st.sidebar.warning("File deleted. Please submit a new feedback to recreate it.")
+                st.rerun()
     else:
-        st.sidebar.info("No records found.")
-elif pass_input != "":
-    st.sidebar.error("Incorrect Password!")
+        st.sidebar.info("No records found yet.")
