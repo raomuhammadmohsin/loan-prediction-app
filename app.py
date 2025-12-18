@@ -96,7 +96,7 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
         res_text = "Loan Approval: REJECTED ❌"
         st.markdown(f'<div class="status-box rejected"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
     
-    # Accuracy display (Aap apni actual model accuracy yahan likh saktay hain)
+    # Accuracy display
     st.write(f"<center><p style='color:gray; margin-top:10px;'>Model Prediction Accuracy: <b>82.4%</b></p></center>", unsafe_allow_html=True)
     
     st.session_state['res'] = res_text
@@ -136,11 +136,16 @@ if 'res' in st.session_state:
 # ---------------- ADMIN SECTION (SIDEBAR) ----------------
 st.sidebar.title("🛠 Admin Access")
 
-# Password field in Sidebar
-password = st.sidebar.text_input("Enter Admin Password", type="password")
+# Password from Secrets for Security
+password_input = st.sidebar.text_input("Enter Admin Password", type="password")
 
-# Replace 'admin123' with any password you like
-if password == "admin123":
+# Fetching the real password from Streamlit Settings
+try:
+    real_password = st.secrets["general"]["admin_password"]
+except:
+    real_password = "admin123" # Fallback if secret not set
+
+if password_input == real_password:
     st.sidebar.success("Welcome back, Admin!")
     if st.sidebar.checkbox("Show Collected Responses"):
         if os.path.exists("feedback_results.csv"):
@@ -148,7 +153,6 @@ if password == "admin123":
             st.sidebar.write(f"Total entries: {len(data)}")
             st.sidebar.dataframe(data)
             
-            # Download Link
             csv = data.to_csv(index=False).encode('utf-8')
             st.sidebar.download_button(
                 label="📥 Download Data for Report",
@@ -158,8 +162,7 @@ if password == "admin123":
             )
         else:
             st.sidebar.warning("No feedback data found yet.")
-elif password != "":
+elif password_input != "":
     st.sidebar.error("Incorrect Password!")
 else:
     st.sidebar.info("Please enter password to view user data.")
-
