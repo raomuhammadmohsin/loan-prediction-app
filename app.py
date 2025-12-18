@@ -49,10 +49,10 @@ except Exception as e:
 # ---------------- HEADER ----------------
 st.title("🏦 Strategic Loan Prediction System")
 st.divider()
-# ---------------- INPUT SECTION (Updated with Validation) ----------------
+
+# ---------------- INPUT SECTION ----------------
 col1, col2, col3 = st.columns(3)
 with col1:
-    # Label ke sath * laga diya
     user_name = st.text_input("Full Name *") 
     gender = st.selectbox("Gender", ["Male", "Female"])
     married = st.selectbox("Married", ["Yes", "No"])
@@ -69,7 +69,7 @@ with col3:
     education = st.selectbox("Education", ["Graduate", "Not Graduate"])
     self_emp = st.selectbox("Self Employed", ["Yes", "No"])
 
-# --- PREDICTION LOGIC (Dynamic Confidence) ---
+# ---------------- PREDICTION LOGIC (Dynamic Confidence) ----------------
 st.divider()
 if st.button("🔍 ANALYZE ELIGIBILITY"):
     if not user_name.strip():
@@ -78,7 +78,6 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
         loan_scaled = loan_pkr / 1000
         total_income = income + co_income
         
-        # Input Data Formating
         input_data = {
             "ApplicantIncome": income, "CoapplicantIncome": co_income, "LoanAmount": loan_scaled,
             "Loan_Amount_Term": term * 12, "Credit_History": ch_val, "TotalIncome": total_income,
@@ -96,12 +95,9 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
 
         input_df = pd.DataFrame([input_data]).reindex(columns=feature_cols, fill_value=0)
         
-        # --- ASLI MODEL KI CALCULATION ---
+        # Asli Model Prediction & Confidence
         prediction = model.predict(input_df)[0]
-        
-        # Ab hum model se pooch rahe hain ke tum kitne % sure ho?
-        probs = model.predict_proba(input_df)[0] 
-        # Agar Approved hai toh Approval ki probability, warna Rejection ki
+        probs = model.predict_proba(input_df)[0]
         confidence = probs[1] if prediction == 1 else probs[0]
         dynamic_acc = round(confidence * 100, 2)
         
@@ -109,35 +105,18 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
         color_class = "approved" if prediction == 1 else "rejected"
         
         st.markdown(f'<div class="status-box {color_class}"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
-        
-        # Ab yahan 82.4 ki jagah dynamic value dikhayen ge
         st.write(f"<center>Prediction Confidence: <b>{dynamic_acc}%</b></center>", unsafe_allow_html=True)
         
-        # Session State update
+        # Save results in session to use in feedback form
         st.session_state['res'] = res_text
-        st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr, "conf": dynamic_acc}
-
-        # --- AUTO-SAVE TO CSV ---
-        auto_entry = {
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "User": user_name,
-            "Income": income,
-            "Loan_Amount": loan_pkr,
-            "Prediction": res_text,
-            "Model_Accuracy": dynamic_acc, # Asli accuracy save hogi
-            "Rating": "N/A",
-            "Accuracy_Opinion": "N/A",
-            "Suggestions": "Pending"
+        st.session_state['user_data'] = {
+            "name": user_name, 
+            "income": income, 
+            "loan": loan_pkr, 
+            "conf": dynamic_acc
         }
-        
-        # Save logic (Wahi purani wali)
-        new_df = pd.DataFrame([auto_entry])
-        cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
-        new_df[cols_order].to_csv("feedback_results.csv", mode='a', header=not os.path.exists("feedback_results.csv"), index=False)
-        
-        st.toast("Data Logged Successfully!")
 
-# ---------------- FEEDBACK SECTION (Fixed Column Order) ----------------
+# ---------------- FEEDBACK SECTION (Saves ONLY on Submit) ----------------
 if 'res' in st.session_state:
     st.divider()
     st.subheader("📝 Project Feedback Form")
@@ -147,21 +126,19 @@ if 'res' in st.session_state:
         sugs = st.text_area("Suggestions")
         
         if st.form_submit_button("Submit Feedback"):
-            # Columns sequence strictly defined here
             feedback_entry = {
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "User": st.session_state['user_data']['name'],
                 "Income": st.session_state['user_data']['income'],
                 "Loan_Amount": st.session_state['user_data']['loan'],
                 "Prediction": st.session_state['res'],
-                "Model_Accuracy": 82.4, # Yeh raha aapka naya column
+                "Model_Accuracy": st.session_state['user_data']['conf'], # Asli Model Confidence
                 "Rating": rating,
                 "Accuracy_Opinion": opinion,
                 "Suggestions": sugs
             }
             
             log_file = "feedback_results.csv"
-            # Define exact order
             cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
             
             new_df = pd.DataFrame([feedback_entry])[cols_order]
@@ -172,13 +149,12 @@ if 'res' in st.session_state:
                 new_df.to_csv(log_file, mode='a', header=False, index=False, quoting=csv.QUOTE_NONNUMERIC)
             
             st.balloons()
-            st.markdown('<p class="success-text">FEEDBACK DONE SUCCESSFULLY! ✅</p>', unsafe_allow_html=True)
+            st.markdown('<p class="success-text">FEEDBACK SUBMITTED & DATA SAVED! ✅</p>', unsafe_allow_html=True)
             time.sleep(2) 
             st.rerun()
 
-# ---------------- ADMIN SIDEBAR (Safe Reading) ----------------
+# ---------------- ADMIN SIDEBAR ----------------
 st.sidebar.title("🛠 Admin Access")
-
 try:
     real_password = st.secrets["admin_password"]
 except:
@@ -190,27 +166,21 @@ if pass_input == real_password:
     st.sidebar.success("Welcome, Admin!")
     if os.path.exists("feedback_results.csv"):
         try:
-            # Error handling ke sath read karein
             df_admin = pd.read_csv("feedback_results.csv", engine='python', on_bad_lines='skip')
-            
-            # Columns order fix karein
             cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
             df_admin = df_admin.reindex(columns=cols_order)
             
             st.sidebar.subheader(f"📊 Total Entries: {len(df_admin)}")
-            
-            edited_df = st.sidebar.data_editor(df_admin, num_rows="dynamic", key="admin_editor_vFinal")
+            edited_df = st.sidebar.data_editor(df_admin, num_rows="dynamic", key="admin_editor_final")
             
             if st.sidebar.button("💾 Save Changes"):
                 edited_df.to_csv("feedback_results.csv", index=False, quoting=csv.QUOTE_NONNUMERIC)
                 st.sidebar.success("Database Updated!")
                 st.rerun()
-                
         except Exception as e:
-            st.sidebar.error("⚠️ Feedback file is corrupted (Column Mismatch).")
-            if st.sidebar.button("🗑️ Reset & Fix File"):
+            st.sidebar.error("⚠️ File Error.")
+            if st.sidebar.button("🗑️ Reset File"):
                 os.remove("feedback_results.csv")
-                st.sidebar.warning("File deleted. Please submit a new feedback to recreate it.")
                 st.rerun()
     else:
         st.sidebar.info("No records found yet.")
