@@ -3,12 +3,14 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
+import csv
+import time
 from datetime import datetime
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Loan System v2.0", layout="wide")
 
-# Custom CSS for UI
+# Custom CSS
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -16,6 +18,7 @@ st.markdown("""
     .status-box { padding: 20px; border-radius: 10px; text-align: center; margin-top: 10px; }
     .approved { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .rejected { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .success-text { color: #28a745; font-weight: bold; font-size: 24px; text-align: center; border: 2px solid #28a745; padding: 10px; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -29,34 +32,27 @@ def load_assets():
 
 try:
     model, feature_cols = load_assets()
-except:
-    st.error("❌ Model or Data files missing! Upload them to GitHub.")
+except Exception as e:
+    st.error(f"❌ Error: {e}")
     st.stop()
 
 # ---------------- HEADER ----------------
 st.title("🏦 Strategic Loan Prediction System")
-st.markdown("Assess loan eligibility and provide feedback for system improvement.")
 st.divider()
 
 # ---------------- INPUT SECTION ----------------
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    st.subheader("👤 Personal")
     user_name = st.text_input("Full Name")
     gender = st.selectbox("Gender", ["Male", "Female"])
     married = st.selectbox("Married", ["Yes", "No"])
     dependents = st.selectbox("Dependents", ["0", "1", "2", "3+"])
-
 with col2:
-    st.subheader("💰 Financial")
     income = st.number_input("Monthly Income (PKR)", min_value=0, value=75000)
     co_income = st.number_input("Co-Applicant Income (PKR)", min_value=0, value=0)
     credit_history = st.selectbox("Credit Record", ["Good", "Poor"])
     ch_val = 1.0 if credit_history == "Good" else 0.0
-
 with col3:
-    st.subheader("🏠 Loan Details")
     loan_pkr = st.number_input("Loan Amount (PKR)", min_value=10000, value=500000)
     term = st.slider("Tenure (Years)", 1, 30, 15)
     property_area = st.selectbox("Area", ["Urban", "Semiurban", "Rural"])
@@ -87,14 +83,11 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
     input_df = pd.DataFrame([input_data]).reindex(columns=feature_cols, fill_value=0)
     prediction = model.predict(input_df)[0]
     
-    if prediction == 1:
-        res_text = "Loan Approval: APPROVED ✅"
-        st.markdown(f'<div class="status-box approved"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
-    else:
-        res_text = "Loan Approval: REJECTED ❌"
-        st.markdown(f'<div class="status-box rejected"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
+    res_text = "APPROVED ✅" if prediction == 1 else "REJECTED ❌"
+    color_class = "approved" if prediction == 1 else "rejected"
     
-    st.write(f"<center><p style='color:gray; margin-top:10px;'>Model Prediction Accuracy: <b>82.4%</b></p></center>", unsafe_allow_html=True)
+    st.markdown(f'<div class="status-box {color_class}"><h2>{res_text}</h2></div>', unsafe_allow_html=True)
+    st.write(f"<center>Model Accuracy: <b>82.4%</b></center>", unsafe_allow_html=True)
     
     st.session_state['res'] = res_text
     st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr}
@@ -103,70 +96,54 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
 if 'res' in st.session_state:
     st.divider()
     st.subheader("📝 Project Feedback Form")
-    with st.form("feedback_form"):
+    with st.form("feedback_form", clear_on_submit=True):
         rating = st.slider("Rate the System (1-5)", 1, 5, 5)
-        opinion = st.radio("Is the prediction accurate?", ["Yes", "Maybe", "No"])
-        sugs = st.text_area("Suggestions for v3.0")
+        opinion = st.radio("Is prediction accurate?", ["Yes", "Maybe", "No"])
+        sugs = st.text_area("Suggestions")
         
         if st.form_submit_button("Submit Feedback"):
             feedback_entry = {
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "User": st.session_state['user_data']['name'],
-                "Income": st.session_state['user_data']['income'],
-                "Loan_Amount": st.session_state['user_data']['loan'],
                 "Prediction": st.session_state['res'],
-                "Rating": rating,
+                "Model_Accuracy": 82.4, 
+                "User_Rating": rating,
                 "Accuracy_Opinion": opinion,
                 "Suggestions": sugs
             }
             
             log_file = "feedback_results.csv"
             new_df = pd.DataFrame([feedback_entry])
-            if not os.path.isfile(log_file):
-                new_df.to_csv(log_file, index=False)
-            else:
-                new_df.to_csv(log_file, mode='a', header=False, index=False)
             
+            if not os.path.isfile(log_file):
+                new_df.to_csv(log_file, index=False, quoting=csv.QUOTE_NONNUMERIC)
+            else:
+                new_df.to_csv(log_file, mode='a', header=False, index=False, quoting=csv.QUOTE_NONNUMERIC)
+            
+            # --- EFFECT & SUCCESS MESSAGE ---
             st.balloons()
-            st.success("Thank you! Your feedback has been recorded.")
+            st.markdown('<p class="success-text">FEEDBACK DONE SUCCESSFULLY! ✅</p>', unsafe_allow_html=True)
+            time.sleep(2) # Balloons dikhane ke liye wait
+            st.rerun()
 
-# ---------------- ADMIN SECTION (SIDEBAR) ----------------
+# ---------------- ADMIN SIDEBAR ----------------
 st.sidebar.title("🛠 Admin Access")
+password = st.sidebar.text_input("Password", type="password")
 
-# Password from Secrets
-password_input = st.sidebar.text_input("Enter Admin Password", type="password")
-
-try:
-    real_password = st.secrets["general"]["admin_password"]
-except:
-    real_password = "admin123" 
-
-if password_input == real_password:
-    st.sidebar.success("Welcome back, Admin!")
-    
+if password == "admin123":
+    st.sidebar.success("Logged In")
     if os.path.exists("feedback_results.csv"):
-        df = pd.read_csv("feedback_results.csv")
+        df_admin = pd.read_csv("feedback_results.csv", engine='python')
+        st.sidebar.subheader(f"Total Feedback: {len(df_admin)}")
         
-        st.sidebar.subheader("📝 Manage Feedbacks")
-        st.sidebar.info("Select row if you want to 'Delete'.")
-
-        # Excel-style editor
-        edited_df = st.sidebar.data_editor(
-            df, 
-            num_rows="dynamic", 
-            use_container_width=True,
-            key="feedback_editor"
-        )
+        # Row selection/deletion control aapke paas hai
+        edited_df = st.sidebar.data_editor(df_admin, num_rows="dynamic", width='stretch', key="editor")
         
         if st.sidebar.button("💾 Save Changes"):
-            edited_df.to_csv("feedback_results.csv", index=False)
-            st.sidebar.success("Data updated successfully!")
+            edited_df.to_csv("feedback_results.csv", index=False, quoting=csv.QUOTE_NONNUMERIC)
+            st.sidebar.success("Changes Saved!")
             st.rerun()
 
         st.sidebar.markdown("---")
-        csv = edited_df.to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button(label="📥 Download Clean Data", data=csv, file_name="loan_data.csv", mime="text/csv")
-    else:
-        st.sidebar.warning("No feedback data found.")
-elif password_input != "":
-    st.sidebar.error("Incorrect Password!")
+        csv_data = df_admin.to_csv(index=False).encode('utf-8')
+        st.sidebar.download_button("📥 Download Data", csv_data, "loan_report.csv")
