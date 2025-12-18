@@ -102,7 +102,7 @@ if st.button("🔍 ANALYZE ELIGIBILITY"):
     st.session_state['res'] = res_text
     st.session_state['user_data'] = {"name": user_name, "income": income, "loan": loan_pkr}
 
-# ---------------- FEEDBACK SECTION ----------------
+# ---------------- FEEDBACK SECTION (Fixed Column Order) ----------------
 if 'res' in st.session_state:
     st.divider()
     st.subheader("📝 Project Feedback Form")
@@ -112,18 +112,24 @@ if 'res' in st.session_state:
         sugs = st.text_area("Suggestions")
         
         if st.form_submit_button("Submit Feedback"):
+            # Columns sequence strictly defined here
             feedback_entry = {
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "User": st.session_state['user_data']['name'],
+                "Income": st.session_state['user_data']['income'],
+                "Loan_Amount": st.session_state['user_data']['loan'],
                 "Prediction": st.session_state['res'],
-                "Model_Accuracy": 82.4,
-                "User_Rating": rating,
+                "Model_Accuracy": 82.4, # Yeh raha aapka naya column
+                "Rating": rating,
                 "Accuracy_Opinion": opinion,
                 "Suggestions": sugs
             }
             
             log_file = "feedback_results.csv"
-            new_df = pd.DataFrame([feedback_entry])
+            # Define exact order
+            cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
+            
+            new_df = pd.DataFrame([feedback_entry])[cols_order]
             
             if not os.path.isfile(log_file):
                 new_df.to_csv(log_file, index=False, quoting=csv.QUOTE_NONNUMERIC)
@@ -135,10 +141,9 @@ if 'res' in st.session_state:
             time.sleep(2) 
             st.rerun()
 
-# ---------------- ADMIN SIDEBAR (SAFE SECRETS) ----------------
+# ---------------- ADMIN SIDEBAR ----------------
 st.sidebar.title("🛠 Admin Access")
 
-# Yahan secrets check ho rahe hain, agar nahi miley toh 'admin123' chalay ga
 try:
     real_password = st.secrets["admin_password"]
 except:
@@ -150,25 +155,26 @@ if pass_input == real_password:
     st.sidebar.success("Welcome, Admin!")
     if os.path.exists("feedback_results.csv"):
         df_admin = pd.read_csv("feedback_results.csv", engine='python')
-        st.sidebar.subheader(f"📊 Total Feedback: {len(df_admin)}")
+        
+        # Enforce column order for display as well
+        cols_order = ["Timestamp", "User", "Income", "Loan_Amount", "Prediction", "Model_Accuracy", "Rating", "Accuracy_Opinion", "Suggestions"]
+        df_admin = df_admin.reindex(columns=cols_order)
+        
+        st.sidebar.subheader(f"📊 Total Entries: {len(df_admin)}")
         
         edited_df = st.sidebar.data_editor(
             df_admin, 
             num_rows="dynamic", 
             width='stretch', 
-            key="admin_editor"
+            key="admin_editor_vFinal"
         )
         
         if st.sidebar.button("💾 Save Changes"):
             edited_df.to_csv("feedback_results.csv", index=False, quoting=csv.QUOTE_NONNUMERIC)
-            st.sidebar.success("Data Updated Successfully!")
+            st.sidebar.success("Database Updated!")
             st.rerun()
-
-        st.sidebar.markdown("---")
-        csv_download = df_admin.to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button("📥 Download Excel Report", csv_download, "loan_feedback_report.csv")
+            
     else:
-        st.sidebar.info("No records found yet.")
-else:
-    if pass_input != "":
-        st.sidebar.error("Incorrect Password!")
+        st.sidebar.info("No records found.")
+elif pass_input != "":
+    st.sidebar.error("Incorrect Password!")
